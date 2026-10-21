@@ -6,8 +6,10 @@
 {{- $repo := .Values.seed.gitops.prod.repoName | default "gitops-prod-spring-boot-lw-poc" }}
 ---
 # V2-17: prod Application sources the prod Gitea remote (not stage).
-# Seed digest is sha256:REPLACE_ME_PROD_DIGEST — Check fails until the learner
-# commits their signed digest here. Check also fails if this app tracks stage.
+# The operator seed creates lw-<student>/gitops-prod-spring-boot-lw-poc so this
+# Application can list refs. Seed digest is sha256:REPLACE_ME_PROD_DIGEST.
+# The Track 6.2 Check fails until the learner commits their signed digest.
+# It also fails if this app tracks the stage remote.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

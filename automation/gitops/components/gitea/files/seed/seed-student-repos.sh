@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Operator seed: admin + student *user*, plus prepared *template* remotes only.
-# The learner creates org lw-student and repos in Showroom Module 2, then runs
-# learner-seed-from-templates.sh to copy template content into those remotes.
+# Operator seed: admin + student user, workshop-templates, and the learner org.
+# Argo Applications lw-poc-staging and lw-poc-prod track lw-<student> GitOps
+# remotes. Those remotes are created here so Argo can list refs. Existing
+# commits are left in place. learner-seed-from-templates.sh remains a repair
+# path if a remote is missing.
 set -euo pipefail
 
 : "${GITEA_URL:?}"
@@ -238,10 +240,66 @@ push_seed_tree() {
   )
 }
 
+ensure_org_owner() {
+  local org="$1" user="$2"
+  local code team_id
+  code="$(curl -sS -o /tmp/gitea-teams.json -w '%{http_code}' \
+    -H "$(admin_auth)" \
+    "${API}/orgs/${org}/teams" || true)"
+  if [[ "${code}" != "200" ]]; then
+    echo "ERROR: list teams for ${org} failed HTTP ${code}" >&2
+    cat /tmp/gitea-teams.json >&2 || true
+    exit 1
+  fi
+  team_id="$(python3 - <<'PY'
+import json
+teams = json.load(open("/tmp/gitea-teams.json"))
+for t in teams:
+    if t.get("name") in ("Owners", "owners"):
+        print(t["id"])
+        break
+PY
+)"
+  if [[ -z "${team_id}" ]]; then
+    echo "ERROR: Owners team not found on ${org}" >&2
+    exit 1
+  fi
+  code="$(curl -sS -o /tmp/gitea-member.json -w '%{http_code}' \
+    -X PUT \
+    -H "$(admin_auth)" \
+    "${API}/teams/${team_id}/members/${user}" || true)"
+  if [[ "${code}" == "204" || "${code}" == "200" ]]; then
+    echo "Ensured ${user} is an owner of ${org}"
+    return 0
+  fi
+  echo "ERROR: add ${user} to ${org} Owners failed HTTP ${code}" >&2
+  cat /tmp/gitea-member.json >&2 || true
+  exit 1
+}
+
+repo_has_commits() {
+  local org="$1" repo_name="$2"
+  local code
+  code="$(curl -sS -o /tmp/gitea-commits.json -w '%{http_code}' \
+    -H "$(admin_auth)" \
+    "${API}/repos/${org}/${repo_name}/commits?limit=1" || true)"
+  [[ "${code}" == "200" ]] && grep -q '"sha"' /tmp/gitea-commits.json
+}
+
+seed_if_empty() {
+  local org="$1" repo_name="$2" repo_desc="$3" subdir="$4" msg="$5"
+  ensure_org_repo "${org}" "${repo_name}" "${repo_desc}"
+  if repo_has_commits "${org}" "${repo_name}"; then
+    echo "Repo ${org}/${repo_name} already has commits — leaving it"
+    return 0
+  fi
+  push_seed_tree "${org}" "${repo_name}" "${subdir}" "${msg}"
+}
+
 ensure_user "${ADMIN_USER}" "${ADMIN_PASSWORD}" "${ADMIN_EMAIL}" "Gitea Admin" "true"
 
 ensure_user "${STUDENT_USERNAME}" "${STUDENT_PASSWORD}" "${STUDENT_EMAIL}" "${STUDENT_FULL_NAME}" "false"
-echo "Learner ${STUDENT_USERNAME} ready — org lw-${STUDENT_USERNAME} + repos are created by the student in Module 2"
+echo "Learner user ${STUDENT_USERNAME} ready"
 
 # Prepared file systems from monorepo isolation → template remotes only
 ensure_org "${TEMPLATES_ORG}" "${TEMPLATES_ORG_FULL_NAME}" "${TEMPLATES_ORG_DESCRIPTION}"
@@ -292,4 +350,24 @@ if [[ -n "${PYTHON_SKELETON_REPO_NAME}" && -d "${SEED_DIR}/${PYTHON_SKELETON_SEE
   echo "TEMPLATE_PYTHON_SKELETON_URL=${GITEA_URL%/}/${TEMPLATES_ORG}/${PYTHON_SKELETON_REPO_NAME}.git"
 fi
 
-echo "gitea-student-repo-seed: complete (users + templates; learner orgs not created)"
+LEARNER_ORG="lw-${STUDENT_USERNAME}"
+echo "Seeding learner org ${LEARNER_ORG} for Argo CD (lw-poc-staging, lw-poc-prod)"
+ensure_org "${LEARNER_ORG}" "Lightwell student" "Learner organization for ${STUDENT_USERNAME}"
+ensure_org_owner "${LEARNER_ORG}" "${STUDENT_USERNAME}"
+ensure_org_owner "${LEARNER_ORG}" "${ADMIN_USER}"
+
+seed_if_empty "${LEARNER_ORG}" "${REPO_NAME}" "${REPO_DESCRIPTION}" "repo" \
+  "Operator seed: Lightwell app tree (Modules 2–6)"
+
+if [[ -n "${GITOPS_REPO_NAME}" && -d "${SEED_DIR}/${GITOPS_SEED_SUBDIR}" ]]; then
+  seed_if_empty "${LEARNER_ORG}" "${GITOPS_REPO_NAME}" "${GITOPS_REPO_DESCRIPTION}" "${GITOPS_SEED_SUBDIR}" \
+    "Operator seed: Lightwell stage GitOps chart (Track 6.1)"
+fi
+
+if [[ -n "${GITOPS_PROD_REPO_NAME}" && -d "${SEED_DIR}/${GITOPS_PROD_SEED_SUBDIR}" ]]; then
+  seed_if_empty "${LEARNER_ORG}" "${GITOPS_PROD_REPO_NAME}" "${GITOPS_PROD_REPO_DESCRIPTION}" "${GITOPS_PROD_SEED_SUBDIR}" \
+    "Operator seed: Lightwell prod GitOps chart (Track 6.2; digest seed is wrong)"
+fi
+
+echo "LEARNER_PROD_GITOPS_URL=${GITEA_URL%/}/${LEARNER_ORG}/${GITOPS_PROD_REPO_NAME}.git"
+echo "gitea-student-repo-seed: complete (templates + ${LEARNER_ORG})"

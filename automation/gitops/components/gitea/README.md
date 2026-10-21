@@ -26,9 +26,8 @@ Python FastAPI chart, overlays, and RHDH template files **stay in git** and are 
 
 ### Learner model
 
-1. Lab scripts / charts **start Gitea** and create the student user.
-2. Learners discover `gitea_url` via `oc`, run `learner-ensure-gitea-user.sh` if needed, then create organization **`lw-student`** and empty repos **`spring-boot-lw-poc`**, **`gitops-spring-boot-lw-poc`** (stage), and **`gitops-prod-spring-boot-lw-poc`** (prod).
-3. Learner runs `learner-seed-from-templates.sh` to push operator-prepared content from **`workshop-templates/`** into those repos. The script also adds **`renovate-bot`** as a write collaborator on the Java app repo (Track 3.3 / V2-24).
+1. Lab scripts / charts **start Gitea**, create the student user, and seed organization **`lw-student`** plus **`spring-boot-lw-poc`**, **`gitops-spring-boot-lw-poc`** (stage), and **`gitops-prod-spring-boot-lw-poc`** (prod). Argo CD Applications `lw-poc-staging` and `lw-poc-prod` track those GitOps remotes. Existing commits are not overwritten.
+2. Learners discover `gitea_url` via `oc`. `learner-seed-from-templates.sh` is the repair path when a remote is missing. It also adds **`renovate-bot`** as a write collaborator on the Java app repo (Track 3.3 / V2-24). The Renovate token Job adds that collaborator when the repo already exists.
 4. RHDH `publish:gitea` targets the same learner org.
 
 | Item | Value |
