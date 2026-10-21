@@ -19,7 +19,7 @@
 # GitOps Configuration
 # ============================================================
 gitops:
-  repoUrl: "https://github.com/rhpds/lightwell-tssc-workshop.git"
+  repoUrl: "https://github.com/mfosterrox/lightwell-tssc-workshop.git"
   revision: "main"
   basePath: "automation/gitops"
 
@@ -159,7 +159,7 @@ components:
     syncWave: "50"
     content:
       # Antora: site.yml → docs/modules/ROOT (Modules 1–6); chart automation/gitops/components/showroom (#19)
-      repoUrl: "https://github.com/rhpds/lightwell-tssc-workshop.git"
+      repoUrl: "https://github.com/mfosterrox/lightwell-tssc-workshop.git"
       repoRef: "main"
       antoraPlaybook: "site.yml"
       image: "quay.io/rhpds/showroom-content:v1.3.1"

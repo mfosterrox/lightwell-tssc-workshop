@@ -13,7 +13,7 @@ showroom:
     userinfo: "4"
 
   content:
-    repoUrl: "https://github.com/rhpds/lightwell-tssc-workshop.git"
+    repoUrl: "https://github.com/mfosterrox/lightwell-tssc-workshop.git"
     repoRef: "main"
     antoraPlaybook: "site.yml"
     image: "quay.io/rhpds/showroom-content:v1.3.1"
